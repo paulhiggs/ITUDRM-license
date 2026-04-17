@@ -88,6 +88,7 @@ function decodeBase64(base64) {
     return bytes.buffer;
 }
 
+const HTMLize = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 ITUDRMLicense = class ITUDRMLicense {
     constructor(Base64license) {
@@ -117,7 +118,7 @@ ITUDRMLicense = class ITUDRMLicense {
             return str;
         };
         this.skip = (numToSkip) => this.index += numToSkip;
-        this.toBase64 = (str) => encodeBase64(str.buffer);
+        this.toBase64 = (str, asHTML = false) => asHTML ? `<span class="base64">${HTMLize(encodeBase64(str.buffer))}</span>` : encodeBase64(str.buffer);
         this.fromBase64 = (str) => new Uint8Array(decodeBase64(str));
         this.isASCII = (str) => {
             for (let i = 0; i < str.length; i++)
@@ -125,14 +126,16 @@ ITUDRMLicense = class ITUDRMLicense {
                     return false;
             return true;
         };
-        this.toASCII = (str) => {
+        this.toASCII = (str, asHTML = false) => {
             let res = "";
             for (let i = 0; i < str.length; i++)
                 res += String.fromCharCode(str[i] || '.'.charCodeAt(0));
-            return res;
+            return asHTML ? `<span class="ascii">${HTMLize(res)}</span>` : res;
         };
-        this.AsciiOrBase64 = (str) => this.isASCII(str) ? this.toASCII(str) : `{${this.toBase64(str)}}`;
+        this.AsciiOrBase64 = (str, asHTML = false) => this.isASCII(str) ? this.toASCII(str, asHTML) : `{${this.toBase64(str, asHTML)}}`;
         this.Reserved = (id) => `Reserved [0x${Math.abs(id).toString(16)}]`;
+        this.Description = (str, asHTML = false) => asHTML ? `<span class="description">${HTMLize(str)}</span>`: str;
+        this.Label = (str, asHTML = false) => asHTML ? `<span class="label">${HTMLize(str)}</span>` : str;
         this.index = 0;
         this.data = this.fromBase64(Base64license);
     }
@@ -178,15 +181,15 @@ ITUDRMLicense = class ITUDRMLicense {
         }
         return this.Reserved(ruleTypeId);
     }
-    parseKeyRule(KeyRuleType, KeyRuleData) {
+    parseKeyRule(KeyRuleType, KeyRuleData, asHTML = false) {
         const alwaysValue = (index) => KeyRuleData[index] ?? 0xFF;
         switch (KeyRuleType) {
             case 0x01: // Start time  
                 const startTime = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return new Date(startTime * 1000).toISOString();
+                return this.Description(new Date(startTime * 1000).toISOString(), asHTML);
             case 0x02: // End time
                 const endTime = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return new Date(endTime * 1000).toISOString();
+                return this.Description(new Date(endTime * 1000).toISOString(), asHTML);
             case 0x03: // Number of uses
                 const numUses = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
                 return numUses.toString();
@@ -199,11 +202,11 @@ ITUDRMLicense = class ITUDRMLicense {
             case 0x06: // Output rules
                 const ruleCode = alwaysValue(0);
                 let res = "Analog output ";
-                switch ((ruleCode & 0b11110000) >> 4) {
-                    case 0b0000:
+                switch (ruleCode & 0b11110000) {
+                    case 0b00000000:
                         res += "No limit";
                         break;
-                    case 0b0001:
+                    case 0b00010000:
                         res += "Disabled";
                         break;
                     default:
@@ -237,7 +240,7 @@ ITUDRMLicense = class ITUDRMLicense {
                         res += this.Reserved(ruleCode & 0x0f);
                         break;
                 }
-                return res;
+                return this.Description(res, asHTML);
             case 0x07: // Client Security Level requirements    
                 const req = alwaysValue(0);
                 switch (req) {
@@ -247,7 +250,7 @@ ITUDRMLicense = class ITUDRMLicense {
                 }
                 return this.Reserved(req);
             case 0xF0: // Digital watermark data
-                const watermarkData = this.AsciiOrBase64(KeyRuleData);
+                const watermarkData = this.AsciiOrBase64(KeyRuleData, asHTML);
                 return `Digital watermark data: ${watermarkData}`;
             case 0xF1: // Key storage rule
                 const storage = alwaysValue(0);
@@ -259,7 +262,7 @@ ITUDRMLicense = class ITUDRMLicense {
                 const allowUpdate = alwaysValue(0);
                 return `License update is ${(allowUpdate == 0x01 ? "" : "not ")}allowed`;
             case 0xF4: // License update URL
-                const url = this.AsciiOrBase64(KeyRuleData);
+                const url = this.AsciiOrBase64(KeyRuleData, asHTML);
                 return `License update URL: ${url}`;
             case 0xF5: // License update start interval
                 const startInterval = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
@@ -268,7 +271,7 @@ ITUDRMLicense = class ITUDRMLicense {
                 const retryInterval = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
                 return `License update retry interval: ${retryInterval} seconds`;
         }
-        return this.AsciiOrBase64(KeyRuleData);
+        return this.AsciiOrBase64(KeyRuleData, asHTML);
     }
     describeUnitType(unitType) {
         switch (unitType) {
@@ -289,7 +292,7 @@ ITUDRMLicense = class ITUDRMLicense {
             const ident_index = this.readUint8();
             const ident_length = this.readUint16();
             res += asHTML 
-             ? `<div class="license-unit"><span class="unit-type">Type: ${ident_type} (${this.describeUnitType(ident_type)})</span>, <span class="unit-index">Index: ${ident_index}</span>, <span class="unit-length">Length: ${ident_length}</span><br>`
+             ? `<div class="license-unit"><span class="unit-type">${this.Label("Type:", true)} ${ident_type} (${this.Description(this.describeUnitType(ident_type), true)})</span>, <span class="unit-index">${this.Label("Index:", true)} ${ident_index}</span>, <span class="unit-length">${this.Label("Length:", true)} ${ident_length}</span><br>`
              : `Type: ${ident_type} (${this.describeUnitType(ident_type)}), Index: ${ident_index}, Length: ${ident_length}\n`;
             switch (ident_type) {
                 case 0x00: // License index
@@ -298,21 +301,21 @@ ITUDRMLicense = class ITUDRMLicense {
                     const licenseUnitsCount = this.readUint8();
                     const licenseTimestamp = this.readUint32();
                     res += asHTML 
-                     ? `<div><span class="license-version">License Version: ${licenseVersion}</span>, <span class="license-id">License ID: ${licenseId}</span>, <span class="license-units-count">License Units Count: ${licenseUnitsCount}</span>, <span class="license-timestamp">License Timestamp: ${new Date(licenseTimestamp * 1000).toISOString()}</span><br></div>`
+                     ? `<div><span class="license-version">${this.Label("License Version:", true)} ${licenseVersion}</span>, <span class="license-id">${this.Label("License ID:", true)} ${licenseId}</span>, <span class="license-units-count">${this.Label("License Units Count:", true)} ${licenseUnitsCount}</span>, <span class="license-timestamp">${this.Label("License Timestamp:", true)} ${new Date(licenseTimestamp * 1000).toISOString()}</span><br></div>`
                      : ` License Version: ${licenseVersion}, License ID: ${licenseId}, License Units Count: ${licenseUnitsCount}, License Timestamp: ${new Date(licenseTimestamp * 1000).toISOString()}\n`;
                     break;
                 case 0x01: // Content
                     const contentIdLen = this.readUint8();
                     const contentId = this.readString(contentIdLen);
                     res += asHTML 
-                     ? `<div><span class="content-id">Content ID: ${this.AsciiOrBase64(contentId)}</span><br></div>`
+                     ? `<div><span class="content-id">${this.Label("Content ID:", true)} ${this.AsciiOrBase64(contentId, true)}</span><br></div>`
                      : ` Content ID: ${this.AsciiOrBase64(contentId)}\n`;
                     const CEKCount = this.readUint8();
                     for (let k = 0; k < CEKCount; k++) {
                         const KeyIdentifierLen = this.readUint8();
                         const KeyIdentifier = this.readString(KeyIdentifierLen);
                         res += asHTML 
-                         ? `<div><span class="key-identifier">Key Identifier[${k + 1}]: ${this.AsciiOrBase64(KeyIdentifier)}</span><br></div>`
+                         ? `<div><span class="key-identifier">${this.Label(`Key Identifier[${k + 1}]`, true)}: ${this.AsciiOrBase64(KeyIdentifier, true)}</span><br></div>`
                          : ` Key Identifier[${k + 1}]: ${this.AsciiOrBase64(KeyIdentifier)}\n`;
                     }
                     break;
@@ -320,7 +323,7 @@ ITUDRMLicense = class ITUDRMLicense {
                     const ObjectType = this.readUint8();
                     const ObjectId = this.readString(ident_length - 1);
                     res += asHTML 
-                     ? `<div><span class="object-type">Object Type: ${ObjectType}</span>, <span class="object-id">Object Id: ${this.AsciiOrBase64(ObjectId)}</span><br></div>`
+                     ? `<div><span class="object-type">${this.Label("Object Type:", true)} ${ObjectType}</span>, <span class="object-id">${this.Label("Object Id:", true)} ${this.AsciiOrBase64(ObjectId, true)}</span><br></div>`
                      : ` Object Type: ${ObjectType}, Object Id: ${this.AsciiOrBase64(ObjectId)}\n`;
                     break;
                 case 0x03: // Key
@@ -328,19 +331,19 @@ ITUDRMLicense = class ITUDRMLicense {
                     const KeyDataLen = this.readUint16();
                     const KeyData = this.readString(KeyDataLen);
                     res += asHTML
-                     ? `<div><span class="key-algorithm">Key Algorithm: ${KeyAlgorithm} (${this.lookupAlgorithm(KeyAlgorithm)})</span>, <span class="key-data">Key Data: ${this.AsciiOrBase64(KeyData)}</span><br></div>`
+                     ? `<div><span class="key-algorithm">${this.Label("Key Algorithm:", true)} ${KeyAlgorithm} (${this.Description(this.lookupAlgorithm(KeyAlgorithm), true)})</span>, <span class="key-data">${this.Label("Key Data:", true)} ${this.AsciiOrBase64(KeyData, true)}</span><br></div>`
                      : ` Key Algorithm: ${KeyAlgorithm} (${this.lookupAlgorithm(KeyAlgorithm)}), Key Data: ${this.AsciiOrBase64(KeyData)}\n`;
                     const KeyType = this.readUint8();
                     const KeyIdentifierLen = this.readUint8();
                     const KeyIdentifier = this.readString(KeyIdentifierLen);
                     res += asHTML 
-                     ? `<div><span class="key-type">Key Type: ${KeyType} (${this.lookupKeyType(KeyType)})</span>, <span class="key-identifier">Key Identifier: ${this.AsciiOrBase64(KeyIdentifier)}</span><br></div>`
+                     ? `<div><span class="key-type">${this.Label("Key Type:", true)} ${KeyType} (${this.Description(this.lookupKeyType(KeyType), true)})</span>, <span class="key-identifier">${this.Label("Key Identifier:", true)} ${this.AsciiOrBase64(KeyIdentifier, true)}</span><br></div>`
                      : ` Key Type: ${KeyType} (${this.lookupKeyType(KeyType)}), Key Identifier: ${this.AsciiOrBase64(KeyIdentifier)}\n`;
                     const UpperKeyType = this.readUint8();
                     const UpperKeyIdentifierLen = this.readUint8();
                     const UpperKeyIdentifier = this.readString(UpperKeyIdentifierLen);
                     res += asHTML
-                     ? `<div><span class="upper-key-type">Upper Key Type: ${UpperKeyType} (${this.lookupKeyType(UpperKeyType)})</span>, <span class="upper-key-identifier">Upper Key Identifier: ${this.AsciiOrBase64(UpperKeyIdentifier)}</span><br></div>`
+                     ? `<div><span class="upper-key-type">${this.Label("Upper Key Type:", true)} ${UpperKeyType} (${this.Description(this.lookupKeyType(UpperKeyType), true)})</span>, <span class="upper-key-identifier">${this.Label("Upper Key Identifier:", true)} ${this.AsciiOrBase64(UpperKeyIdentifier, true)}</span><br></div>`
                      : ` Upper Key Type: ${UpperKeyType} (${this.lookupKeyType(UpperKeyType)}), Upper Key Identifier: ${this.AsciiOrBase64(UpperKeyIdentifier)}\n`;
                     break;
                 case 0x04: // Key usage rule
@@ -348,7 +351,7 @@ ITUDRMLicense = class ITUDRMLicense {
                     const KeyIdentifierLen4 = this.readUint8();
                     const KeyIdentifier4 = this.readString(KeyIdentifierLen4);
                     res += asHTML
-                     ? `<div><span class="key-type">Key Type: ${KeyType4} (${this.lookupKeyType(KeyType4)})</span>, <span class="key-identifier">Key Identifier: ${this.AsciiOrBase64(KeyIdentifier4)}</span><br></div>`
+                     ? `<div><span class="key-type">${this.Label("Key Type:", true)} ${KeyType4} (${this.Description(this.lookupKeyType(KeyType4), true)})</span>, <span class="key-identifier">${this.Label("Key Identifier:", true)} ${this.AsciiOrBase64(KeyIdentifier4, true)}</span><br></div>`
                      : ` Key Type: ${KeyType4} (${this.lookupKeyType(KeyType4)}), Key Identifier: ${this.AsciiOrBase64(KeyIdentifier4)}\n`;
                     const KeyRulesNum = this.readUint8();
                     for (let r = 0; r < KeyRulesNum; r++) {
@@ -356,7 +359,7 @@ ITUDRMLicense = class ITUDRMLicense {
                         const KeyRuleLen = this.readUint8();
                         const KeyRuleData = this.readString(KeyRuleLen);
                         res += asHTML
-                         ? `<div><span class="key-rule">Key Rule[${r + 1}]: Type: ${KeyRuleType} (${this.lookupKeyUsageRuleType(KeyRuleType)}), Data: ${this.parseKeyRule(KeyRuleType, KeyRuleData)}</span><br></div>`
+                         ? `<div><span class="key-rule">${this.Label(`Key Rule[${r + 1}]:`, true)} ${this.Label("Type:", true)} ${KeyRuleType} (${this.Description(this.lookupKeyUsageRuleType(KeyRuleType), true)}), ${this.Label("Data:", true)} ${this.parseKeyRule(KeyRuleType, KeyRuleData, true)}</span><br></div>`
                          : ` Key Rule[${r + 1}]: Type: ${KeyRuleType} (${this.lookupKeyUsageRuleType(KeyRuleType)}), Data: ${this.parseKeyRule(KeyRuleType, KeyRuleData)}\n`;
                     }
                     break;
@@ -367,11 +370,11 @@ ITUDRMLicense = class ITUDRMLicense {
                     const SignatureLength = this.readUint16();
                     const Signature = this.readString(SignatureLength);
                     res += asHTML
-                     ? `<div><span class="algorithm">Algorithm: ${Algorithm} (${this.lookupAlgorithm(Algorithm)})</span>, <span class="key-id">Key ID: ${this.AsciiOrBase64(KeyID)}</span>, <span class="signature">Signature: ${this.AsciiOrBase64(Signature)}</span><br></div>`
+                     ? `<div><span class="algorithm">${this.Label("Algorithm:", true)} ${Algorithm} (${this.Description(this.lookupAlgorithm(Algorithm), true)})</span>, <span class="key-id">${this.Label("Key ID:", true)} ${this.AsciiOrBase64(KeyID, true)}</span>, <span class="signature">${this.Label("Signature:", true)} ${this.AsciiOrBase64(Signature, true)}</span><br></div>`
                      : ` Algorithm: ${Algorithm} (${this.lookupAlgorithm(Algorithm)}), Key ID: ${this.AsciiOrBase64(KeyID)}, Signature: ${this.AsciiOrBase64(Signature)}`;
                     break;
                 default:
-                    res += `Reserved Unit Type: ${ident_type}  (see ITU-T J.1041 table 8-1)\n`;
+                    res += `${this.Label("Reserved Unit Type:", true)} ${ident_type}  (see ITU-T J.1041 table 8-1)\n`;
                     this.skip(ident_length);
                     break;
             }
