@@ -1,0 +1,16 @@
+{
+  "name": "itudrm-license",
+  "version": "1.0.0",
+  "description": "Parser for ITU-T J.1041 DRM License",
+  "license": "ISC",
+  "author": "Paul Higgs",
+  "type": "module",
+  "main": "decode.ts",
+  "scripts": {
+    "build": "npx tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "typescript": "^6.0.3"
+  }
+}

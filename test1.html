@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+    <title>ITUDRM License Parser</title>
+    <script src="./ITUDRMlicense.js"></script>
+    <script>
+        function parseLicense() {
+            const base64License = document.getElementById("src").value;
+            const license = new ITUDRMLicense(base64License);
+            document.getElementById("result").innerHTML = license.asString(true);
+        }
+        function testLicense() {
+            document.getElementById("src").value = "AAAADgLsiPAI2FNZ4QlpFc67AQEAMw9ITV8wNzAxX1JFTkVXMjACEFVEUk1fVEVTVF9DSURfMDQQVURSTV9URVNUX0NJRF8xMAICACEAiXuUlP0VYurb8+MQEzjU5YqYZktyFmXCMjnudPMpAkQDAwA3IgAQxEgDxD0m6ran1jlrZsTPJQEQVURSTV9URVNUX0NJRF8wNCAQumthZk0WgFIjPE5dWWhMmQMEADciABDnAxI00JGOWki1aGhMHzx0ARBVRFJNX1RFU1RfQ0lEXzEwIBC6a2FmTRaAUiM8Tl1ZaEyZBAUAmgEQVURSTV9URVNUX0NJRF8wNAsBBGaCDYMCBGpEdIMEBAAAAAAGAQMHAQHxAQHyBAAAAADzAQH0VWh0dHA6Ly9saWNlbnNlLmRldi50cnVzdGR0YS5jb206ODA4MC9kcm1wcm94eS92My9nZXRMaWNlbnNlP2NvbnRlbnRJZD1ITV8wNzAxX1JFTkVXMjD1BAAAABT2BAAAAA8EBgCaARBVRFJNX1RFU1RfQ0lEXzEwCwEEZoINgwIEakR0gwQEAAAAAAYBAwcBAfEBAfIEAAAAAPMBAfRVaHR0cDovL2xpY2Vuc2UuZGV2LnRydXN0ZHRhLmNvbTo4MDgwL2RybXByb3h5L3YzL2dldExpY2Vuc2U/Y29udGVudElkPUhNXzA3MDFfUkVORVcyMPUEAAAAFPYEAAAADwMHAKgSAHEEJrOqmENZ6voEGZsTjC3iYGrMkn7csHbSFL+mfwxHowT1yHX562BPknRNv8BaFxUEwjawe6AruzZRaKLedSBWrAqGAHCyYa7yBDB8Mvc5laW2yQIt3mU/xG7Sgtr4kHaGorXou8jMh1EBgUkRyMzTFCAQumthZk0WgFIjPE5dWWhMmQMgiXuUlP0VYurb8+MQEzjU5YqYZktyFmXCMjnudPMpAkQDCAC4EgCBBNHVcBpCttp9lkJuL1xtKwEFmFtpaodtdYbF+u8EyMu9DQtFj2yVMR8W/hhzYKpmuExBx40om5Av9HqCZcFMDqOlM8RdJEB2ICr0q/S00neU/W54LGJ66WpnmoZPnJF/OFgnv1+dhuho8b85YjuOwIX5bGk8JnmgZZszMkJl6sPQIRDeNWJraagqtcWsUWWA+GkPAyCJe5SU/RVi6tvz4xATONTliphmS3IWZcIyOe508ykCRP8JADRDEN41YmtpqCq1xaxRZYD4aQ8AII67zHnNHBnxYQtuLwOLjM7r/vYfiNaWL5Jyq16dhWq9";
+
+        }
+    </script>
+</head>
+<body>
+    <div>
+        <textarea id="src" name="src" rows="10" cols="100"></textarea>
+        <input type="button" value="Test" onclick="testLicense()"/>
+        <input type="button" value="Parse License" onclick="parseLicense()"/>
+    </div>
+    <hr>
+    <p id="result"></p>
+
+
+
+</body>
+
+</html>
