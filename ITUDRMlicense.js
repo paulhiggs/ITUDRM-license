@@ -88,6 +88,27 @@ function decodeBase64(base64) {
     return bytes.buffer;
 }
 
+/**
+ Copyright 2026 Paul Higgs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the “Software”), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 const HTMLize = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 ITUDRMLicense = class ITUDRMLicense {
@@ -118,7 +139,7 @@ ITUDRMLicense = class ITUDRMLicense {
             return str;
         };
         this.skip = (numToSkip) => this.index += numToSkip;
-        this.toBase64 = (str, asHTML = false) => asHTML ? `<span class="base64">${HTMLize(encodeBase64(str.buffer))}</span>` : encodeBase64(str.buffer);
+        this.toBase64 = (str, asHTML = false) => asHTML ? `<span class="base64" title="Base64">${HTMLize(encodeBase64(str.buffer))}</span>` : encodeBase64(str.buffer);
         this.fromBase64 = (str) => new Uint8Array(decodeBase64(str));
         this.isASCII = (str) => {
             for (let i = 0; i < str.length; i++)
@@ -130,14 +151,18 @@ ITUDRMLicense = class ITUDRMLicense {
             let res = "";
             for (let i = 0; i < str.length; i++)
                 res += String.fromCharCode(str[i] || '.'.charCodeAt(0));
-            return asHTML ? `<span class="ascii">${HTMLize(res)}</span>` : res;
+            return asHTML ? `<span class="ascii" title="ASCII">${HTMLize(res)}</span>` : res;
         };
-        this.AsciiOrBase64 = (str, asHTML = false) => this.isASCII(str) ? this.toASCII(str, asHTML) : `{${this.toBase64(str, asHTML)}}`;
+        this.AsciiOrBase64 = (str, asHTML = false) => this.isASCII(str) ? this.toASCII(str, asHTML) : this.toBase64(str, asHTML);
         this.Reserved = (id) => `Reserved [0x${Math.abs(id).toString(16)}]`;
         this.Description = (str, asHTML = false) => asHTML ? `<span class="description">${HTMLize(str)}</span>`: str;
         this.Label = (str, asHTML = false) => asHTML ? `<span class="label">${HTMLize(str)}</span>` : str;
         this.index = 0;
-        this.data = this.fromBase64(Base64license);
+        try {
+            this.data = this.fromBase64(Base64license);
+        } catch (e) {
+            this.error = `Error parsing license: ${e.message}`;
+        }
     }
     lookupAlgorithm(algId) {
         switch (algId) {
@@ -192,13 +217,13 @@ ITUDRMLicense = class ITUDRMLicense {
                 return this.Description(new Date(endTime * 1000).toISOString(), asHTML);
             case 0x03: // Number of uses
                 const numUses = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return numUses.toString();
+                return this.Description(`Number of uses: ${numUses.toString()}`, asHTML);
             case 0x04: // Time period
                 const timePeriod = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return timePeriod.toString();
+                return this.Description(`Time period: ${timePeriod.toString()}`, asHTML);
             case 0x05: // Time period
                 const cumulativeTimePeriod = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return cumulativeTimePeriod.toString();
+                return this.Description(`Cumulative time period: ${cumulativeTimePeriod.toString()}`, asHTML);
             case 0x06: // Output rules
                 const ruleCode = alwaysValue(0);
                 let res = "Analog output ";
@@ -251,25 +276,25 @@ ITUDRMLicense = class ITUDRMLicense {
                 return this.Reserved(req);
             case 0xF0: // Digital watermark data
                 const watermarkData = this.AsciiOrBase64(KeyRuleData, asHTML);
-                return `Digital watermark data: ${watermarkData}`;
+                return this.Description(`Digital watermark data: ${watermarkData}`, asHTML);
             case 0xF1: // Key storage rule
                 const storage = alwaysValue(0);
-                return `Local storage is ${(storage == 0x01 ? "" : "not ")}allowed`;
+                return this.Description(`Local storage is ${(storage == 0x01 ? "" : "not ")}allowed`, asHTML);
             case 0xF2: // Latest playback start interval
                 const interval = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return `Latest playback start interval: ${interval} seconds`;
+                return this.Description(`Latest playback start interval: ${interval} seconds`, asHTML);
             case 0xF3: // Allow license update
                 const allowUpdate = alwaysValue(0);
-                return `License update is ${(allowUpdate == 0x01 ? "" : "not ")}allowed`;
+                return this.Description(`License update is ${(allowUpdate == 0x01 ? "" : "not ")}allowed`, asHTML);
             case 0xF4: // License update URL
                 const url = this.AsciiOrBase64(KeyRuleData, asHTML);
-                return `License update URL: ${url}`;
+                return this.Description("License update URL: ", asHTML) + url;
             case 0xF5: // License update start interval
                 const startInterval = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return `License update start interval: ${startInterval} seconds`;
+                return this.Description(`License update start interval: ${startInterval} seconds`, asHTML);
             case 0xF6: // License update retry interval
                 const retryInterval = alwaysValue(0) << 24 | alwaysValue(1) << 16 | alwaysValue(2) << 8 | alwaysValue(3);
-                return `License update retry interval: ${retryInterval} seconds`;
+                return this.Description(`License update retry interval: ${retryInterval} seconds`, asHTML);
         }
         return this.AsciiOrBase64(KeyRuleData, asHTML);
     }
@@ -285,14 +310,17 @@ ITUDRMLicense = class ITUDRMLicense {
         return this.Reserved(unitType);
     }
     asString(asHTML = false) {
-        let res = "";
+        if (this.error) {
+            return asHTML ? `<div class="license-error">${this.error}</div>` : `Error: ${this.error}`;
+        }
+        let res = asHTML ? "<table class='license-table'>" : "";
         this.index = 0;
         while (this.hasMore()) {
             const ident_type = this.readUint8();
             const ident_index = this.readUint8();
             const ident_length = this.readUint16();
             res += asHTML 
-             ? `<div class="license-unit"><span class="unit-type">${this.Label("Type:", true)} ${ident_type} (${this.Description(this.describeUnitType(ident_type), true)})</span>, <span class="unit-index">${this.Label("Index:", true)} ${ident_index}</span>, <span class="unit-length">${this.Label("Length:", true)} ${ident_length}</span><br>`
+             ? `<tr class="license-row"><td><div class="license-unit"><span class="unit-type">${this.Label("Type:", true)} ${ident_type} (${this.Description(this.describeUnitType(ident_type), true)})</span>, <span class="unit-index">${this.Label("Index:", true)} ${ident_index}</span>, <span class="unit-length">${this.Label("Length:", true)} ${ident_length}</span><br>`
              : `Type: ${ident_type} (${this.describeUnitType(ident_type)}), Index: ${ident_index}, Length: ${ident_length}\n`;
             switch (ident_type) {
                 case 0x00: // License index
@@ -374,11 +402,13 @@ ITUDRMLicense = class ITUDRMLicense {
                      : ` Algorithm: ${Algorithm} (${this.lookupAlgorithm(Algorithm)}), Key ID: ${this.AsciiOrBase64(KeyID)}, Signature: ${this.AsciiOrBase64(Signature)}`;
                     break;
                 default:
-                    res += `${this.Label("Reserved Unit Type:", true)} ${ident_type}  (see ITU-T J.1041 table 8-1)\n`;
+                    res += asHTML
+                     ? `<div><span class="unknown-unit">${this.Label("Reserved Unit Type:", true)} ${ident_type}  (see ITU-T J.1041 table 8-1)</span><br/></div>`
+                     : ` Reserved Unit Type: ${ident_type}  (see ITU-T J.1041 table 8-1)\n`
                     this.skip(ident_length);
                     break;
             }
-            if (asHTML) res += `</div>`;
+            if (asHTML) res += `</div></td></tr>`;
         }
         return res;
     }

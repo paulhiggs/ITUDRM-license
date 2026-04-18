@@ -23,6 +23,28 @@
             padding: 2px 4px;
             border-radius: 3px;
         }
+        .license-table  {
+            border-collapse: collapse;
+            border-color: #8a1f8a;
+            border-width: 1px;
+            border-style: solid;
+            width: 100%;
+        }
+        .license-table td {
+            border-color: #8a1f8a;
+            border-width: 1px;
+            border-style: solid;
+            padding: 4px;
+        }
+        div.license-unit {
+            margin-top: 6px;
+            margin-bottom: 6px;
+            line-height: 130%;
+        }
+        .license-error {
+            color: red;
+            font-weight: bold;
+        }
     </style>
     <script src="./ITUDRMlicense.js"></script>
     <script>
@@ -40,11 +62,11 @@
 <body>
     <div>
         <textarea id="src" name="src" rows="10" cols="100"></textarea>
-        <input type="button" value="Test" onclick="testLicense()"/>
+        <input type="button" value="Test" title="load a test license"onclick="testLicense()"/>
         <input type="button" value="Parse License" onclick="parseLicense()"/>
     </div>
     <hr>
-    <p id="result"></p>
+    <div id="result"></div>
 
 
 
